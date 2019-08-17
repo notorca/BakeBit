@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2.7
 #
 # BakeBit example for the basic functions of BakeBit 128x64 OLED (http://wiki.friendlyarm.com/wiki/index.php/BakeBit_-_OLED_128x64)
 #
@@ -69,7 +69,7 @@ oled.init()  #initialze SEEED OLED display
 oled.setNormalDisplay()      #Set display to normal mode (i.e non-inverse mode)
 oled.setHorizontalMode()
 
-global drawing 
+global drawing
 drawing = False
 
 global image
@@ -77,15 +77,20 @@ image = Image.new('1', (width, height))
 global draw
 draw = ImageDraw.Draw(image)
 global fontb24
-fontb24 = ImageFont.truetype('DejaVuSansMono-Bold.ttf', 24);
-global font14 
-font14 = ImageFont.truetype('DejaVuSansMono.ttf', 14);
+fontb24 = ImageFont.truetype('DejaVuSansMono-Bold.ttf', 24)
+global font14
+font14 = ImageFont.truetype('DejaVuSansMono.ttf', 14)
+#Added
+global font12
+font12 = ImageFont.truetype('DejaVuSansMono.ttf', 12)
 global smartFont
-smartFont = ImageFont.truetype('DejaVuSansMono-Bold.ttf', 10);
+smartFont = ImageFont.truetype('DejaVuSansMono-Bold.ttf', 10)
+global font10
+font10 = ImageFont.truetype('DejaVuSansMono.ttf', 10)
 global fontb14
-fontb14 = ImageFont.truetype('DejaVuSansMono-Bold.ttf', 14);
+fontb14 = ImageFont.truetype('DejaVuSansMono-Bold.ttf', 14)
 global font11
-font11 = ImageFont.truetype('DejaVuSansMono.ttf', 11);
+font11 = ImageFont.truetype('DejaVuSansMono.ttf', 11)
 
 global lock
 lock = threading.Lock()
@@ -115,7 +120,6 @@ def draw_page():
     global image
     global draw
     global oled
-    global font
     global font14
     global smartFont
     global width
@@ -151,7 +155,7 @@ def draw_page():
     drawing = True
     lock.release()
 
-    # Draw a black filled box to clear the image.            
+    # Draw a black filled box to clear the image.
     draw.rectangle((0,0,width,height), outline=0, fill=0)
     # Draw current page indicator
     if showPageIndicator:
@@ -167,40 +171,69 @@ def draw_page():
             dotTop=dotTop+dotWidth+dotPadding
 
     if page_index==0:
-        text = time.strftime("%A")
-        draw.text((2,2),text,font=font14,fill=255)
-        text = time.strftime("%e %b %Y")
-        draw.text((2,18),text,font=font14,fill=255)
-        text = time.strftime("%X")
-        draw.text((2,40),text,font=fontb24,fill=255)
+        try:
+            IPAddress = get_ip_address('eth0')
+        except:
+            IPAddress = get_ip()
+
+        draw.text((2,2),"IP:" + str(IPAddress),font=font12, fill=255)
+
+
+        #draw.text((2,16), "Data Statistics:", font=font12, fill=255)
+        #This months usage
+        cmd = "vnstat -m 2 -i eth0 | grep \"$(date +'%Y-%m')\" | awk '{print $8\" \"substr ($9, 1, 3)}'"
+        #cmd = "vnstat -m 2 -i eth0 | grep \"2019-09\" | awk '{print $8\" \"substr ($9, 1, 3)}'" #Usage for this month
+        strCurrentUsage = subprocess.check_output(cmd, shell = True )
+        draw.text((2,30),"Usage: " + strCurrentUsage, font=font12, fill=255)
+
+        #Last months usage
+        cmd = "vnstat -m 2 -i eth0 | grep \"$(date --date=\"$(date +%Y-%m-15) -1 month\" +'%Y-%m')\" | awk '{print $8\" \"substr ($9, 1, 3)}'"
+        #cmd = "vnstat -m 2 -i eth0 | grep \"2019-08\" | awk '{print $8\" \"substr ($9, 1, 3)}'" #Usage for this month
+        strCurrentUsage = subprocess.check_output(cmd, shell = True )
+        draw.text((2,45),"Last: " + strCurrentUsage, font=font12, fill=255)
+
+        #text = time.strftime("%A")
+        #draw.text((2,2),text,font=font14,fill=255)
+        #text = time.strftime("%e %b %Y")
+        #draw.text((2,18),text,font=font14,fill=255)
+        #text = time.strftime("%X")
+        #draw.text((2,40),text,font=fontb24,fill=255)
     elif page_index==1:
         # Draw some shapes.
         # First define some constants to allow easy resizing of shapes.
         padding = 2
         top = padding
-        bottom = height-padding
         # Move left to right keeping track of the current x position for drawing shapes.
         x = 0
         try:
             IPAddress = get_ip_address('eth0')
         except:
             IPAddress = get_ip()
-        cmd = "top -bn1 | grep load | awk '{printf \"CPU Load: %.2f\", $(NF-2)}'"
+        #Get CPU Load Averages
+        #cmd = "uptime | cut -d : -f 4" #This option fails after a while
+        #cmd = "uptime | awk '{print $9, $10, $11}'"
+        #cmd = "top -bn1 | grep load | awk '{printf \"CPU Load: %.2f\", $(NF-2)}'"
+        cmd = "uptime | awk '{if ($4 == \"min,\") print $9, $10, $11; else print $8, $9, $10;}'"
         CPU = subprocess.check_output(cmd, shell = True )
+        #Get system uptime
+        cmd = "uptime -p | cut -c3-" #1 hour, x minutes
+        UpTime = subprocess.check_output(cmd, shell = True )
         cmd = "free -m | awk 'NR==2{printf \"Mem: %s/%sMB %.2f%%\", $3,$2,$3*100/$2 }'"
         MemUsage = subprocess.check_output(cmd, shell = True )
         cmd = "df -h | awk '$NF==\"/\"{printf \"Disk: %d/%dGB %s\", $3,$2,$5}'"
         Disk = subprocess.check_output(cmd, shell = True )
-        tempI = int(open('/sys/class/thermal/thermal_zone0/temp').read());
+        tempI = int(open('/sys/class/thermal/thermal_zone0/temp').read())
         if tempI>1000:
             tempI = tempI/1000
-        tempStr = "CPU TEMP: %sC" % str(tempI)
+        tempStr = "Temperature: %sC" % str(tempI)
 
-        draw.text((x, top+5),       "IP: " + str(IPAddress),  font=smartFont, fill=255)
-        draw.text((x, top+5+12),    str(CPU), font=smartFont, fill=255)
-        draw.text((x, top+5+24),    str(MemUsage),  font=smartFont, fill=255)
-        draw.text((x, top+5+36),    str(Disk),  font=smartFont, fill=255)
-        draw.text((x, top+5+48),    tempStr,  font=smartFont, fill=255)
+        #draw.text((x, top+5),       "IP: " + str(IPAddress),  font=smartFont, fill=255)
+        draw.text((x, top+1),    "CPU:" + str(CPU), font=font10, fill=255)
+        #draw.text((x, top+5+12),    str(CPU), font=smartFont, fill=255)
+        draw.text((x, top+5+8),         "Up: " + str(UpTime), font=font10, fill=255)
+        draw.text((x, top+5+20),    str(MemUsage),  font=font10, fill=255)
+        draw.text((x, top+5+32),    str(Disk),  font=font10, fill=255)
+        draw.text((x, top+5+44),    tempStr,  font=font10, fill=255)
     elif page_index==3: #shutdown -- no
         draw.text((2, 2),  'Shutdown?',  font=fontb14, fill=255)
 
@@ -261,7 +294,7 @@ def receive_signal(signum, stack):
         return
 
     if signum == signal.SIGUSR1:
-        print 'K1 pressed'
+        print('K1 pressed')
         if is_showing_power_msgbox():
             if page_index==3:
                 update_page_index(4)
@@ -273,12 +306,12 @@ def receive_signal(signum, stack):
             draw_page()
 
     if signum == signal.SIGUSR2:
-        print 'K2 pressed'
+        print('K2 pressed')
         if is_showing_power_msgbox():
             if page_index==4:
                 update_page_index(5)
                 draw_page()
- 
+
             else:
                 update_page_index(0)
                 draw_page()
@@ -287,7 +320,7 @@ def receive_signal(signum, stack):
             draw_page()
 
     if signum == signal.SIGALRM:
-        print 'K3 pressed'
+        print('K3 pressed')
         if is_showing_power_msgbox():
             update_page_index(0)
             draw_page()
